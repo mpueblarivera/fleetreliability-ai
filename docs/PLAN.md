@@ -12,7 +12,7 @@
 | **Problema de Negocio** | Mitigación de detenciones no programadas en maquinaria crítica mediante detección de falla inminente con optimización de umbrales por matriz de costos operacionales. |
 | **Target ML** | Clasificación Binaria Calibrada: $P(\text{Falla} \mid X) \in [0, 1]$. En servicio/reportabilidad, se mapea a un **Sistema de Múltiples Umbrales Operacionales** (Normal, Inspección CBM Temprana, Intervención Crítica) para evitar paradas radicales injustificadas. |
 | **Dataset Benchmark** | *AI4I 2020 Predictive Maintenance Dataset* (UCI Machine Learning Repository). 10.000 observaciones de telemetría de sensores industriales. |
-| **Stack Principal** | Python 3.11, Poetry, Scikit-learn, LightGBM, XGBoost, FastAPI, Pydantic, Docker. |
+| **Stack Principal** | Python 3.11, Astral `uv`, Scikit-learn, LightGBM, XGBoost, FastAPI, Pydantic, Docker. |
 | **Alineación con CV** | Conecta directamente con experiencia en CBM, RCM, MTBF/MTTR y optimización operacional sin infringir acuerdos de confidencialidad (NDA). |
 
 ---
@@ -165,14 +165,14 @@ fleetreliability-ai/
 │   └── test_api.py              # Tests del endpoint /predict con TestClient
 ├── Dockerfile                   # Imagen ligera python:3.11-slim
 ├── docker-compose.yml           # Para levantar API con un solo comando
-├── pyproject.toml               # Dependencias fijadas con Poetry
-├── poetry.lock
-├── requirements.txt             # Exportado desde Poetry para facilitar revisión a pares
+├── pyproject.toml               # Dependencias declaradas (PEP 621 / PEP 735)
+├── uv.lock                      # Lockfile determinista generado por Astral uv
+├── requirements.txt             # Exportado desde uv para facilitar revisión a pares
 └── README.md                    # Descripción de negocio, arquitectura, API y cómo correr
 ```
 
 > [!TIP]
-> **Pro-Tip para Revisores Pares:** Aunque Poetry es la herramienta principal, incluir un archivo `requirements.txt` generado automáticamente (`poetry export -f requirements.txt --output requirements.txt --without-hashes`) evita que un revisor par novato en Poetry penalice la reproducibilidad.
+> **Pro-Tip para Revisores Pares:** Aunque `uv` es el orquestador principal, incluir un archivo `requirements.txt` generado automáticamente (`uv export --no-hashes --no-dev -o requirements.txt`) evita que un revisor par novato en `uv` penalice la reproducibilidad.
 
 ---
 

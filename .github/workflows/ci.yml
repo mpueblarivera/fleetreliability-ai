@@ -14,21 +14,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.11"
+          version: "latest"
+          enable-cache: true
 
-      - name: Install Poetry
-        run: pip install poetry
+      - name: Set up Python 3.11
+        run: uv python install 3.11
 
       - name: Install dependencies
-        run: poetry install --no-root
+        run: uv sync --all-groups
 
       - name: Check formatting with Black & isort
         run: |
-          poetry run black --check src tests
-          poetry run isort --check-only src tests
+          uv run black --check src tests
+          uv run isort --check-only src tests
 
       - name: Run unit tests with Pytest
-        run: poetry run pytest -v
+        run: uv run pytest -v

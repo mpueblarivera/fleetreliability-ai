@@ -23,7 +23,7 @@ Unplanned downtime in critical mining and industrial machinery (e.g., SAG mill p
 
 ```text
 fleetreliability-ai/
-├── .github/workflows/       # Automated CI pipeline (linting & unit tests)
+├── .github/workflows/       # Automated CI pipeline with astral-sh/setup-uv
 ├── data/
 │   ├── raw/                 # Original UCI AI4I 2020 dataset
 │   └── processed/           # Processed & split datasets
@@ -33,10 +33,10 @@ fleetreliability-ai/
 ├── notebooks/               # Exploratory Data Analysis (EDA) & Model Tuning
 ├── src/                     # Production source code (features, train, predict)
 ├── tests/                   # Pytest unit & API integration tests
-├── Dockerfile               # Production container definition (python:3.11-slim)
+├── Dockerfile               # Production container definition (uv-powered)
 ├── docker-compose.yml       # Local container orchestration
-├── pyproject.toml           # Poetry dependency & project configuration
-├── poetry.lock              # Deterministic lockfile
+├── pyproject.toml           # Standard PEP 621 / PEP 735 dependency declaration
+├── uv.lock                  # Deterministic Astral uv lockfile
 ├── requirements.txt         # Exported dependencies for universal reproducibility
 └── README.md                # Project documentation
 ```
@@ -45,25 +45,22 @@ fleetreliability-ai/
 
 ## 3. Environment Setup & Installation
 
-This project uses **Python 3.11** and **Poetry** for deterministic dependency management (with an exported `requirements.txt` for universal compatibility).
+This project uses **Python 3.11** and **Astral `uv`** for lightning-fast, deterministic dependency management (with an exported `requirements.txt` for universal compatibility).
 
-### Option A: Using Poetry (Recommended for Development)
+### Option A: Using `uv` (Recommended — 10x to 100x Faster)
 ```bash
 # 1. Clone the repository
 git clone <REPO_URL>
 cd fleetreliability-ai
 
-# 2. Configure Poetry to create the virtualenv inside the project (.venv)
-poetry config virtualenvs.in-project true
+# 2. Sync all dependencies and create the .venv automatically
+uv sync --all-groups
 
-# 3. Install dependencies
-poetry install --no-root
-
-# 4. Activate the virtual environment (or run commands via `poetry run`)
+# 3. Activate the virtual environment (or prefix commands with `uv run`)
 source .venv/bin/activate
 ```
 
-### Option B: Using Standard `venv` + `pip`
+### Option B: Using Standard `venv` + `pip` (Peer Review Fallback)
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate
@@ -77,10 +74,10 @@ pip install -r requirements.txt
 ### Local Execution (once `src/train.py` and `src/predict.py` are implemented)
 ```bash
 # Train the model and generate artifacts
-poetry run python -m src.train
+uv run python -m src.train
 
 # Start the FastAPI inference service on port 9696
-poetry run uvicorn src.predict:app --host 0.0.0.0 --port 9696 --reload
+uv run uvicorn src.predict:app --host 0.0.0.0 --port 9696 --reload
 ```
 
 ### Containerized Execution with Docker
