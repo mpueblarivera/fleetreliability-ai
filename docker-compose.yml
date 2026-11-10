@@ -1,0 +1,11 @@
+services:
+  fleetreliability-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fleetreliability-api
+    ports:
+      - "9696:9696"
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
