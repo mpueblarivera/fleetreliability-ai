@@ -8,4 +8,13 @@ services:
       - "9696:9696"
     environment:
       - PYTHONUNBUFFERED=1
+      - PORT=9696
+      - MODEL_PATH=models/best_model.bin
+      - LOG_LEVEL=info
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:9696/health')\" || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped

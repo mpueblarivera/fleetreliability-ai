@@ -19,6 +19,7 @@ dependencies = [
     "pydantic>=2.9.2",
     "matplotlib>=3.9.2",
     "seaborn>=0.13.2",
+    "pyarrow>=26.0.1",
 ]
 
 [dependency-groups]
