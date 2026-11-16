@@ -3,8 +3,12 @@
 **Predictive Maintenance & Condition-Based Monitoring (CBM) System for Heavy Industrial & Mining Equipment**  
 *Machine Learning Zoomcamp — Mid-Term Project*
 
+[![CI Pipeline](https://github.com/mpueblarivera/fleetreliability-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/mpueblarivera/fleetreliability-ai/actions/workflows/ci.yml)
 [![Render Live Service](https://img.shields.io/badge/Render-Live%20Service-46E3B7?logo=render&logoColor=white)](https://fleetreliability-ai.onrender.com/docs)
 [![Docker](https://img.shields.io/badge/Docker-python%3A3.11--slim-2496ED?logo=docker&logoColor=white)](Dockerfile)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](pyproject.toml)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fleetreliability-ai.onrender.com/docs)
+[![uv](https://img.shields.io/badge/uv-managed-DE5FE9?logo=astral&logoColor=white)](uv.lock)
 
 ---
 
