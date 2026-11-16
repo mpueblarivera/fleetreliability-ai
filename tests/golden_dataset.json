@@ -1,0 +1,65 @@
+[
+  {
+    "case_id": "GOLDEN-NORMAL-01",
+    "payload": {
+      "machine_id": "PUMP-SAG-GOLDEN-01",
+      "machine_type": "M",
+      "air_temperature_k": 298.2,
+      "process_temperature_k": 308.7,
+      "rotational_speed_rpm": 1500.0,
+      "torque_nm": 42.8,
+      "tool_wear_min": 45.0
+    },
+    "expected_status": "NORMAL",
+    "expected_criticality": "LOW",
+    "risk_bounds": [0.0, 0.0099],
+    "expected_physics": {
+      "mechanical_power_kw": 6.723008278682157,
+      "temperature_difference_k": 10.5,
+      "strain_index_min_nm": 1926.0,
+      "heat_stress_ratio": 7.0
+    }
+  },
+  {
+    "case_id": "GOLDEN-INSPECTION-02",
+    "payload": {
+      "machine_id": "COMPRESSOR-GOLDEN-02",
+      "machine_type": "H",
+      "air_temperature_k": 300.7,
+      "process_temperature_k": 310.8,
+      "rotational_speed_rpm": 1296.0,
+      "torque_nm": 58.2,
+      "tool_wear_min": 204.0
+    },
+    "expected_status": "INSPECTION_REQUIRED",
+    "expected_criticality": "HIGH",
+    "risk_bounds": [0.15, 0.5],
+    "expected_physics": {
+      "mechanical_power_kw": 7.898717913361601,
+      "temperature_difference_k": 10.1,
+      "strain_index_min_nm": 11872.8,
+      "heat_stress_ratio": 7.793209876543227
+    }
+  },
+  {
+    "case_id": "GOLDEN-CRITICAL-03",
+    "payload": {
+      "machine_id": "CRUSHER-GOLDEN-03",
+      "machine_type": "H",
+      "air_temperature_k": 303.0,
+      "process_temperature_k": 313.5,
+      "rotational_speed_rpm": 1250.0,
+      "torque_nm": 88.0,
+      "tool_wear_min": 245.0
+    },
+    "expected_status": "CRITICAL_INTERVENTION",
+    "expected_criticality": "CRITICAL",
+    "risk_bounds": [0.8, 1.0],
+    "expected_physics": {
+      "mechanical_power_kw": 11.519173063162574,
+      "temperature_difference_k": 10.5,
+      "strain_index_min_nm": 21560.0,
+      "heat_stress_ratio": 8.4
+    }
+  }
+]
