@@ -48,3 +48,6 @@ data/processed/*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local-only development task specs
+.tasks_local/

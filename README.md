@@ -108,7 +108,7 @@ See [`docs/PLAN.md`](docs/PLAN.md) for the complete architecture diagram, physic
 ## 6. Phase 1: Data Ingestion, Physics Feature Engineering & EDA
 
 > [!NOTE]
-> **Phase Status:** `COMPLETED` — All structural audits, leakage-free stratified splits, vectorized physics features, exploratory visualizations, and 5-Fold Stratified CV baseline benchmarks (`LogisticRegression`) have been executed and verified against [`docs/tasks/01_data_ingestion_and_eda.md`](docs/tasks/01_data_ingestion_and_eda.md).
+> **Phase Status:** `COMPLETED` — All structural audits, leakage-free stratified splits, vectorized physics features, exploratory visualizations, and 5-Fold Stratified CV baseline benchmarks (`LogisticRegression`) have been executed and verified.
 
 ### 6.1 Industrial Mining Context & Dataset Overview (UCI AI4I 2020)
 
@@ -187,7 +187,7 @@ uv run jupyter notebook notebooks/notebook.ipynb
 ## 7. Phase 2: Multi-Model Benchmarking, Calibration & 2D Monte Carlo Cost Optimization
 
 > [!NOTE]
-> **Phase Status:** `COMPLETED` — Multi-model hyperparameter tuning (4 algorithm families under zero-leakage 5-Fold Stratified CV), post-hoc probability calibration, 2D joint Monte Carlo threshold optimization, single-pass locked Holdout Test evaluation, and compressed artifact serialization ([`models/best_model.bin`](models/best_model.bin)) have been executed and verified against [`docs/tasks/02_experimentation_and_benchmarks.md`](docs/tasks/02_experimentation_and_benchmarks.md).
+> **Phase Status:** `COMPLETED` — Multi-model hyperparameter tuning (4 algorithm families under zero-leakage 5-Fold Stratified CV), post-hoc probability calibration, 2D joint Monte Carlo threshold optimization, single-pass locked Holdout Test evaluation, and compressed artifact serialization ([`models/best_model.bin`](models/best_model.bin)) have been executed and verified.
 
 ### 7.1 Multi-Model Benchmarking on `train_dev` ($N = 8{,}000$, 5-Fold Stratified CV)
 
@@ -284,7 +284,7 @@ The calibrated pipeline, canonical feature schema, operational thresholds $(\the
 ## 8. Phase 3: Production Modularization, FastAPI Service & Stochastic Fleet Simulator
 
 > [!NOTE]
-> **Phase Status:** `COMPLETED` — Production feature engineering ([`src/features.py`](src/features.py)), autonomous CLI training with locked holdout governance ([`src/train.py`](src/train.py)), FastAPI REST inference service with Pydantic v2 physical validation and tri-threshold CBM policy ([`src/predict.py`](src/predict.py)), stochastic Wiener/Random-Walk fleet simulator ([`src/fleet_simulator.py`](src/fleet_simulator.py)), and the 91-test `pytest` suite including the CI/CD Golden Dataset ([`tests/golden_dataset.json`](tests/golden_dataset.json)) have been implemented and verified against [`docs/tasks/03_refactor_and_service_api.md`](docs/tasks/03_refactor_and_service_api.md).
+> **Phase Status:** `COMPLETED` — Production feature engineering ([`src/features.py`](src/features.py)), autonomous CLI training with locked holdout governance ([`src/train.py`](src/train.py)), FastAPI REST inference service with Pydantic v2 physical validation and tri-threshold CBM policy ([`src/predict.py`](src/predict.py)), stochastic Wiener/Random-Walk fleet simulator ([`src/fleet_simulator.py`](src/fleet_simulator.py)), and the 91-test `pytest` suite including the CI/CD Golden Dataset ([`tests/golden_dataset.json`](tests/golden_dataset.json)) have been implemented and verified.
 
 ### 8.1 Reproducible `uv` Workflow (Training, Testing, API & Simulator)
 
