@@ -57,7 +57,7 @@ This project uses **Python 3.11** and **Astral `uv`** for lightning-fast, determ
 ### Option A: Using `uv` (Recommended — 10x to 100x Faster)
 ```bash
 # 1. Clone the repository
-git clone <REPO_URL>
+git clone https://github.com/mpueblarivera/fleetreliability-ai.git
 cd fleetreliability-ai
 
 # 2. Sync all dependencies and create the .venv automatically
