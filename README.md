@@ -72,6 +72,9 @@ source .venv/bin/activate
 python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+# Optional: install dev tools to run tests or the EDA notebook without `uv`
+pip install jupyter pytest httpx
 ```
 
 ---
