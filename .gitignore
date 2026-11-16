@@ -33,13 +33,10 @@ data/processed/*
 !data/processed/.gitkeep
 
 # Serialized local model artifacts (track only the canonical champion artifact)
-models/*.pkl
-models/*.bin
-models/*.joblib
-!models/best_model.bin
 *.pkl
 *.bin
 *.joblib
+!models/best_model.bin
 
 # Environment variables & secrets
 .env
