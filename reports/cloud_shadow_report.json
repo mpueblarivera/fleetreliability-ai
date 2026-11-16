@@ -1,8 +1,8 @@
 {
-  "generated_at_utc": "2026-11-16T02:47:11.185303+00:00",
+  "generated_at_utc": "2026-11-16T04:33:04.395910+00:00",
   "validation_scope": "Operational and economic simulation only. Statistical generalization metrics are evaluated strictly on locked real data (UCI AI4I 2020).",
   "simulation_config": {
-    "api_url": "http://127.0.0.1:9696",
+    "api_url": "https://fleetreliability-ai.onrender.com",
     "num_machines": 5,
     "shift_hours": 12,
     "num_shifts": 2,
