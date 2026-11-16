@@ -591,3 +591,6 @@ Observed 2-shift operational simulation (`5` machines × `24` hourly steps = `12
 | **Calibrated Multi-Threshold ($\theta_1^*=0.01, \theta_2^*=0.76$)** | **$48,097.74** | — |
 | **Static Threshold ($0.50$)** | $45,642.18 | -$2,455.56 *(vs Static 0.5)* |
 | **Reactive Run-to-Failure** | $509,828.80 | **+$461,731.06** *(vs Reactive)* |
+
+> [!NOTE]
+> **Why `Static (0.50)` is `$2,455.56` lower than `(0.01, 0.76)` in this 24h synthetic run:** The dual thresholds $(\theta_1^*=0.01, \theta_2^*=0.76)$ were calibrated on the empirical UCI AI4I 2020 distribution (~3.4% failure rate) under a risk-averse objective ($J = \mathbb{E}[\text{Cost}] + 0.15 \cdot P_{90}$). In this accelerated 24h Wiener simulation (`120` events, `31.7%` critical events), `theta_warning=0.01` issues conservative early inspections (`INSPECTION_REQUIRED`, $c_{\text{fp}}$) and `theta_critical=0.76` routes mid-high probabilities ($0.50 \le p < 0.76$) through inspection before intervention ($c_{\text{fp}} + c_{\text{tp}}$ on true positives), whereas `Static (0.50)` triggers immediate intervention ($c_{\text{tp}}$) without an inspection buffer. Even in this high-density synthetic stream, the calibrated policy reduces total maintenance cost by **90.6%** (**+$461,731.06**) relative to Reactive Run-to-Failure.
