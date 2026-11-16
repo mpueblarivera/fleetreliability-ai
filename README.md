@@ -566,6 +566,8 @@ PYTHONPATH=. uv run python src/fleet_simulator.py \
 
 ### 9.4 Verified Cloud Evidence (`https://fleetreliability-ai.onrender.com`)
 
+![Live Swagger UI on Render](reports/figures/render_swagger_ui.png)
+
 #### A. Automated E2E Suite (`scripts/test_e2e_cloud.sh`)
 Observed execution against `https://fleetreliability-ai.onrender.com`:
 
