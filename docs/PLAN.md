@@ -1,183 +1,132 @@
-# FleetReliability-AI: Plan Maestro de Arquitectura y Ejecución
+# FleetReliability-AI: Architecture & Technical Reference
+
 **Machine Learning Zoomcamp — Mid-Term Project**  
-*Autor: Martín Puebla Rivera | Lead ML Engineer & Reliability Specialist*
+*Author: Martín Puebla Rivera*
 
 ---
 
-## 1. Resumen Ejecutivo y Propuesta de Valor
+## 1. Executive Summary & Technical Scope
 
-| Parámetro | Definición Técnica |
+| Parameter | Technical Specification |
 | :--- | :--- |
-| **Proyecto** | **FleetReliability-AI**: Sistema predictivo de alerta temprana y monitoreo de condición (CBM) para equipos industriales/mineros. |
-| **Problema de Negocio** | Mitigación de detenciones no programadas en maquinaria crítica mediante detección de falla inminente con optimización de umbrales por matriz de costos operacionales. |
-| **Target ML** | Clasificación Binaria Calibrada: $P(\text{Falla} \mid X) \in [0, 1]$. En servicio/reportabilidad, se mapea a un **Sistema de Múltiples Umbrales Operacionales** (Normal, Inspección CBM Temprana, Intervención Crítica) para evitar paradas radicales injustificadas. |
-| **Dataset Benchmark** | *AI4I 2020 Predictive Maintenance Dataset* (UCI Machine Learning Repository). 10.000 observaciones de telemetría de sensores industriales. |
-| **Stack Principal** | Python 3.11, Astral `uv`, Scikit-learn, LightGBM, XGBoost, FastAPI, Pydantic, Docker. |
-| **Alineación con CV** | Conecta directamente con experiencia en CBM, RCM, MTBF/MTTR y optimización operacional sin infringir acuerdos de confidencialidad (NDA). |
+| **Project** | **FleetReliability-AI**: Predictive failure-risk and Condition-Based Monitoring (CBM) system for heavy industrial/mining machinery. |
+| **Business Problem** | Mitigate unplanned equipment downtime through early failure detection and stochastic cost-calibrated decision thresholds. |
+| **ML Formulation** | Calibrated binary probability `P(Failure | X) ∈ [0, 1]`, mapped to a **Tri-Zone Operational Action Policy** (`NORMAL`, `INSPECTION_REQUIRED`, `CRITICAL_INTERVENTION`) to avoid unnecessary full shutdowns. |
+| **Benchmark Dataset** | *AI4I 2020 Predictive Maintenance Dataset* (UCI Machine Learning Repository), 10,000 industrial sensor telemetry records. |
+| **Core Stack** | Python 3.11, Astral `uv`, Scikit-learn, LightGBM, XGBoost, FastAPI, Pydantic v2, Docker, Render. |
 
 ---
 
-## 2. Flujo de Arquitectura de la Solución
+## 2. End-to-End Solution Architecture
 
 ```mermaid
 flowchart TD
-    subgraph DataIngestion ["1. Ingesta & Feature Engineering Físico"]
-        D1["Telemetría de Sensores<br/>(Air Temp, Proc Temp, RPM, Torque, Tool Wear)"] --> FE["Cálculo de Variables Físicas:<br/>• ΔT = T_proc - T_air<br/>• Potencia = Torque × RPM × 2π/60<br/>• Esfuerzo Acumulado = Tool Wear × Torque"]
-        FE --> Split["Gobernanza de Datos (80/20):<br/>• 80% Dev (Nested / Stratified 5-Fold OOF)<br/>• 20% Holdout Test Bloqueado (data/processed/)"]
+    subgraph DataIngestion ["1. Data Ingestion & Physics Feature Engineering"]
+        D1["Sensor Telemetry<br/>(Air Temp, Process Temp, RPM, Torque, Tool Wear)"] --> FE["Physics-Informed Features:<br/>• ΔT = T_process - T_air<br/>• P_mech = Torque × RPM × 2π / 60,000<br/>• Strain Index = Tool Wear × Torque<br/>• Heat Stress Ratio = ΔT / RPM × 1,000"]
+        FE --> Split["Data Governance (80/20 Stratified):<br/>• 80% train_dev (5-Fold Stratified OOF)<br/>• 20% test_holdout Locked (data/processed/)"]
     end
 
-    subgraph Experimentation ["2. Experimentación & Selección (notebook.ipynb)"]
+    subgraph Experimentation ["2. Benchmarking & Calibration (notebooks/notebook.ipynb)"]
         Split --> M1["Baseline: Logistic Regression"]
-        Split --> M2["Ensamble: Random Forest"]
-        Split --> M3["Gradient Boosting: LightGBM"]
-        Split --> M4["Gradient Boosting: XGBoost"]
-        M1 & M2 & M3 & M4 --> Eval["Evaluación OOF & Optimización de Costo:<br/>• Stratified 5-Fold CV (PR-AUC, F2)<br/>• Simulación Monte Carlo (Costo bajo Incertidumbre)<br/>• Calibración de Doble Umbral (θ1*, θ2*)"]
-        Eval --> Best["Selección del Mejor Modelo + Evaluación Única Holdout<br/>+ Guardado Artifact (.bin / .pkl)"]
+        Split --> M2["Bagging: Random Forest"]
+        Split --> M3["Boosting: LightGBM"]
+        Split --> M4["Boosting: XGBoost"]
+        M1 & M2 & M3 & M4 --> Eval["OOF Evaluation & 2D Monte Carlo:<br/>• 5-Fold Stratified CV (PR-AUC, F2, Brier)<br/>• Stochastic Cost Optimization (M = 1,000)<br/>• Dual-Threshold Calibration (θ₁*, θ₂*)"]
+        Eval --> Best["Champion Selection + Single Holdout Pass<br/>+ Artifact Export (models/best_model.bin)"]
     end
 
-    subgraph Production ["3. Producción, Servicio Web & Simulador (src/)"]
-        Best --> API["FastAPI Application (src/predict.py)"]
-        Pydantic["Esquema Pydantic:<br/>Validación física de rangos"] --> API
-        API --> Policy["Política Operacional Multi-Umbral:<br/>• p < θ1*: NORMAL<br/>• θ1* ≤ p < θ2*: INSPECTION_REQUIRED<br/>• p ≥ θ2*: CRITICAL_INTERVENTION"]
-        Policy --> Modes["Modos de Operación:<br/>• On-Demand API (POST /predict)<br/>• Batch / Turnos 1h & 12h (Reportabilidad CBM)"]
-        Sim["Simulador Estocástico de Flota<br/>(src/fleet_simulator.py - Wiener/Random Walk)"] -->|Payloads JSON periódicos| API
-        Golden["CI/CD Golden Dataset (tests/)<br/>Regresión de contrato y reglas"] -.->|pytest GitHub Actions| API
+    subgraph Production ["3. Modular Service & Simulator (src/)"]
+        Best --> API["FastAPI Service (src/predict.py)"]
+        Pydantic["Pydantic v2 Schema:<br/>Physical Range Validation"] --> API
+        API --> Policy["Tri-Zone Operational Policy:<br/>• p < θ₁*: NORMAL<br/>• θ₁* ≤ p < θ₂*: INSPECTION_REQUIRED<br/>• p ≥ θ₂*: CRITICAL_INTERVENTION"]
+        Policy --> Modes["Serving Modes:<br/>• On-Demand REST (POST /predict)<br/>• Shift-Level Batch Reporting (1h / 12h)"]
+        Sim["Stochastic Fleet Simulator<br/>(src/fleet_simulator.py — Wiener Walk)"] -->|Periodic JSON Payloads| API
+        Golden["CI/CD Golden Dataset (tests/)<br/>Contract & Threshold Regression"] -.->|pytest GitHub Actions| API
     end
 
-    subgraph Deployment ["4. Empaquetado, Despliegue & Shadow Mode"]
-        API --> Docker["Docker Container (python:3.11-slim)"]
-        Docker --> Cloud["Despliegue Cloud Costo 0<br/>(Render / GCP Cloud Run / Hugging Face Spaces)"]
-        Cloud --> Shadow["Shadow Mode & Reportabilidad:<br/>Política (θ1*, θ2*) vs Baseline (0.5) vs Reactivo<br/>Log de Ahorro Económico Acumulado"]
+    subgraph Deployment ["4. Containerization, Cloud & Shadow Mode"]
+        API --> Docker["Docker Container (python:3.11-slim, non-root)"]
+        Docker --> Cloud["Render Cloud Free Tier (HTTPS)"]
+        Cloud --> Shadow["Shadow Mode & Shift Reporting:<br/>Calibrated (θ₁*, θ₂*) vs Static (0.50) vs Reactive<br/>Cumulative Cost Comparison"]
     end
 ```
 
 ---
 
-## 3. Dataset e Ingeniería de Características Físicas
+## 3. Dataset & Physics-Informed Feature Engineering
 
-### 3.1 Atributos Crudos (Raw Features)
-- `Type`: Calidad del producto / variante del equipo ($L$, $M$, $H$).
-- `Air temperature [K]`: Temperatura ambiental en faena.
-- `Process temperature [K]`: Temperatura del proceso en el componente.
-- `Rotational speed [rpm]`: Velocidad angular del eje.
-- `Torque [Nm]`: Par motor aplicado.
-- `Tool wear [min]`: Desgaste acumulado de la herramienta de corte / componente.
+### 3.1 Raw Telemetry Attributes
+- `machine_type` (`Type`): Asset quality / criticality tier (`L`, `M`, `H`).
+- `air_temperature_k`: Ambient operating temperature `[K]`.
+- `process_temperature_k`: Component process temperature `[K]`.
+- `rotational_speed_rpm`: Shaft angular velocity `[rpm]`.
+- `torque_nm`: Applied mechanical torque `[Nm]`.
+- `tool_wear_min`: Cumulative tool / component wear `[min]`.
 
-### 3.2 Nuevas Características Informadas por Dominio Físico
+### 3.2 Domain-Derived Physical Features
 
-$$P_{\text{mech}} = \text{Torque} \times \text{Rotational speed} \times \frac{2\pi}{60 \times 1000} \quad [\text{kW}]$$
+$$P_{\text{mech}} = \text{Torque} \times \text{Rotational speed} \times \frac{2\pi}{60\,000} \quad [\text{kW}]$$
 
 $$\Delta T = T_{\text{process}} - T_{\text{air}} \quad [\text{K}]$$
 
 $$\text{Strain Index} = \text{Tool wear} \times \text{Torque} \quad [\text{min}\cdot\text{Nm}]$$
 
-$$\text{Specific Heat Stress Ratio} = \frac{\Delta T}{\text{Rotational speed}} \times 1000$$
+$$\text{Heat Stress Ratio} = \frac{\Delta T}{\max(\text{Rotational speed}, \epsilon)} \times 1\,000$$
 
 > [!NOTE]
-> Estas variables tienen una justificación física directa: capturan modos de falla térmicos ($HDF$), sobrecarga o caída de potencia ($PWF$), y sobre-esfuerzo mecánico ($OSF$).
+> These engineered features map directly to the physical failure modes in AI4I 2020: Heat Dissipation Failure (`HDF`), Power Failure (`PWF`), and Overstrain Failure (`OSF`).
 
 ---
 
-## 4. Estrategia de Modelado y Optimización de Costos (Monte Carlo)
+## 4. Modeling & 2D Monte Carlo Cost Optimization
 
-1. **Modelos a contrastar:**
-   - **Baseline:** `LogisticRegression` (con variables numéricas escaladas vía `StandardScaler`).
-   - **Bagging:** `RandomForestClassifier` (análisis de importancia de características por impureza y permutación).
-   - **Boosting 1:** `LGBMClassifier` (optimizado para velocidad y manejo de desbalance vía `scale_pos_weight`).
-   - **Boosting 2:** `XGBClassifier` (con regularización L1/L2 para control de sobreajuste).
+1. **Candidate Model Families:**
+   - **Baseline:** `LogisticRegression` (with `StandardScaler` + `OneHotEncoder(drop="first")`).
+   - **Bagging:** `RandomForestClassifier` (with MDI and Out-of-Fold Permutation Feature Importance).
+   - **Gradient Boosting:** `LGBMClassifier` and `XGBClassifier`.
+2. **Primary Statistical Metrics:**
+   - Under `3.39%` positive class prevalence: **PR-AUC (Average Precision)**, **F2-Score**, **ROC-AUC**, and **Brier Score** (isotonic vs. sigmoid calibration).
+3. **Stochastic Cost Model (`M = 1,000` Monte Carlo realizations):**
+   - **False Negative Cost (`C_FN` — unplanned catastrophic failure):**
+     - `C_FN = C_damage + (MTTR × Downtime_Rate × K_Type)`
+     - `MTTR ~ LogNormal(μ = 8 h, σ = 2 h)`, `C_damage ~ Normal(USD 5,000, USD 1,000)`, `Downtime_Rate = USD 1,500/hr`, criticality `K_Type ∈ {1.0 (L), 1.5 (M), 2.5 (H)}`.
+   - **False Positive Cost (`C_FP` — preventive CBM inspection):**
+     - `C_FP ~ Normal(USD 350, USD 50)`.
+   - **True Positive Intervention Cost (`C_TP` — planned shutdown & repair):**
+     - `C_TP ~ Normal(USD 1,200, USD 200)`.
+   - **Risk-Averse 2D Objective (`λ_risk = 0.15`):**
 
-2. **Métricas Estadísticas Base:**
-   - Dado el desbalance de clases (~$3.39\%$ positivas): **PR-AUC (Average Precision)** y **F2-Score** (priorizando el Recall para minimizar fallas imprevistas).
+$$J(\theta_1, \theta_2) = \mathbb{E}[\text{Cost}(\theta_1, \theta_2)] + 0.15 \cdot \text{VaR}_{90}(\theta_1, \theta_2), \quad \theta_1 < \theta_2$$
 
-3. **Optimización de Costo bajo Incertidumbre (Simulación Monte Carlo):**
-   - **Costo de Falso Negativo ($C_{\text{FN}}$ — Parada no programada / Falla catastrófica):**
-     $$C_{\text{FN}} = C_{\text{daño componente}} + (\text{MTTR} \times \text{Lucro Cesante por hora} \times K_{\text{Type}})$$
-     donde:
-     - $\text{MTTR} \sim \text{LogNormal}(\mu=8\text{ hrs}, \sigma=2\text{ hrs})$
-     - $K_{\text{Type}}$ es el factor de criticidad ($L = 1.0$, $M = 1.5$, $H = 2.5$).
-   - **Costo de Falso Positivo ($C_{\text{FP}}$ — Alarma de inspección injustificada):**
-     $$C_{\text{FP}} \sim \text{Normal}(\mu=\$350\text{ USD}, \sigma=\$50\text{ USD})$$
-   - **Simulación Monte Carlo (1.000 iteraciones por candidato de umbral):**
-     Evalúa Costo Esperado $\mathbb{E}[\text{Costo}(\theta)]$ y Riesgo Extremo al Percentil 90 ($P_{90}$ / Value-at-Risk) para determinar la tupla óptima $(\theta_1^*, \theta_2^*)$.
-
-4. **Política de Escalonamiento de Alertas para la API:**
-   - **Zona Normal ($p < \theta_1^*$):** `NORMAL` $\rightarrow$ Operación continua dentro de tolerancias nominales.
-   - **Zona de Inspección CBM ($\theta_1^* \le p < \theta_2^*$):** `INSPECTION_REQUIRED` $\rightarrow$ Emisión de Orden de Trabajo (OT) preventiva no destructiva (termografía/vibraciones) en cambio de turno.
-   - **Zona Crítica ($p \ge \theta_2^*$):** `CRITICAL_INTERVENTION` $\rightarrow$ Sugerencia de *derating* inmediato y parada programada.
+4. **API Tri-Zone Escalation Policy (`θ₁* = 0.01`, `θ₂* = 0.76`):**
+   - `NORMAL` (`p < θ₁*`): Continue nominal operation.
+   - `INSPECTION_REQUIRED` (`θ₁* ≤ p < θ₂*`): Issue a preventive non-destructive CBM work order (thermography / vibration analysis) for the next shift handover.
+   - `CRITICAL_INTERVENTION` (`p ≥ θ₂*`): Recommend immediate load derating and planned shutdown.
 
 ---
 
-## 5. Arquitectura de Monitoreo Operacional, Simulador y Validación MLOps
+## 5. Operational Monitoring, Simulator & MLOps Validation Pillars
 
-### 5.1 Paradigmas de Operación e Inferencia
-El sistema está diseñado para operar sin depender de un flujo continuo en tiempo real (streaming SCADA), soportando dos modos complementarios en planta:
-1. **Monitoreo por Turnos / Batch (Reportabilidad Periódica):** Consolidación periódica de telemetría (cada **1 hora** o al cierre de **turno de 12 horas**) que evalúa la flota y genera el semáforo de mantenimiento (`NORMAL`, `INSPECTION_REQUIRED`, `CRITICAL_INTERVENTION`) junto con las órdenes de trabajo preventivas para el planificador.
-2. **Inferencia Bajo Demanda (On-Demand API):** Consulta puntual interactiva o programática vía FastAPI `POST /predict`, ingresando la condición instantánea de una máquina para diagnóstico inmediato y obtención de variables físicas derivadas.
+### 5.1 Serving Modes
+1. **On-Demand API Inference:** Real-time `POST /predict` queries returning calibrated risk score, operational tier, CBM recommendation, and derived physics telemetry.
+2. **Shift-Level Batch Reporting:** Periodic fleet consolidation (every 1h across 12h shifts) via `src/fleet_simulator.py` to generate work-order summaries and policy cost comparisons.
 
-### 5.2 Simulador Estocástico de Flota (`src/fleet_simulator.py`)
-Para demostrar el ciclo completo de reportabilidad y comparar políticas económicas sin un SCADA real conectado:
-- **Generador de Degradación Sintética (Random Walk / Proceso de Wiener):** Simula $N$ máquinas independientes (ej. 5 bombas SAG) donde `tool_wear` avanza monótonamente con las horas operacionales y las variables de proceso (`air_temperature_k`, `process_temperature_k`, `rotational_speed_rpm`, `torque_nm`) evolucionan con deriva y ruido gaussiano $\mathcal{N}(0, \sigma^2)$ hacia regímenes de sobrecarga o desgaste crítico.
-- **Flujo End-to-End:** `Simulador (payloads JSON periódicos)` $\rightarrow$ `FastAPI /predict` $\rightarrow$ `Motor de Decisión Multi-Umbral` $\rightarrow$ `Log/Reporte de Reportabilidad Operacional`.
-- **Simulación de Costos Acumulados:** Cuantifica el ahorro económico estimado (usando la matriz estocástica Monte Carlo) de la política calibrada $(\theta_1^*, \theta_2^*)$ frente a una política reactiva ("fallar y reparar") y un clasificador con umbral estático de `0.5`.
+### 5.2 MLOps Validation Pillars
 
-### 5.3 Los 4 Pilares de Validación MLOps (Experimentación y Despliegue)
-
-| Pilar | Etapa | Mecanismo Técnico | Qué Valida |
+| Pillar | Stage | Mechanism | What It Validates |
 | :--- | :--- | :--- | :--- |
-| **1. Gobernanza del Holdout** | Experimentación (Fase 2) | `test` set (20%) estrictamente bloqueado en `data/processed/` para evaluación final única. Selección de modelo, *feature engineering* y calibración de $(\theta_1^*, \theta_2^*)$ ejecutadas vía **Nested CV / Stratified 5-Fold (OOF)** sobre el 80% de desarrollo. | Ausencia de *data leakage* y estimación imparcial de generalización. |
-| **2. Golden Dataset en CI/CD** | Pre-despliegue (Fase 3) | *Golden subset* representativo (`NORMAL`, `INSPECTION_REQUIRED`, `CRITICAL_INTERVENTION`) almacenado en `tests/` y ejecutado automáticamente con `pytest` en GitHub Actions. | Integridad del contrato JSON, calibración de scores y reglas de decisión ante cambios en `src/predict.py`. |
-| **3. Evaluación Online Simulada / Shadow Mode** | Despliegue (Fase 4) | `src/fleet_simulator.py` ejecuta en paralelo sobre el mismo stream sintético la política calibrada $(\theta_1^*, \theta_2^*)$ vs. el baseline estático (`0.5`), registrando discrepancias y diferencial de costos acumulados. | Estabilidad de servicio, reportabilidad por turno y valor económico operativo del doble umbral. |
-| **4. Separación Estadística vs. Operacional** | Transversal (Fases 1–4) | Distinción metodológica estricta entre datos empíricos históricos y streams sintéticos de demostración. | **Generalización estadística:** exclusivamente sobre datos reales (UCI AI4I 2020). **Arquitectura MLOps, reportabilidad e impacto económico:** sobre el simulador estocástico. |
-
-> [!IMPORTANT]
-> **Regla de Oro de Validación:** Las métricas de capacidad predictiva (PR-AUC, $F_2$-Score, Brier Score) **jamás** se reportan sobre datos generados por `src/fleet_simulator.py`. El simulador valida la arquitectura de inferencia, la reportabilidad operacional y el comportamiento económico relativo de la política multi-umbral.
+| **1. Holdout Governance** | Phase 2 | Locked 20% `test_holdout.csv` evaluated once; model tuning, calibration, and `(θ₁*, θ₂*)` optimization run strictly on 5-Fold Stratified OOF (`train_dev.csv`). | Zero data leakage and unbiased generalization estimates. |
+| **2. CI/CD Golden Dataset** | Phase 3 | Anchor payloads (`NORMAL`, `INSPECTION_REQUIRED`, `CRITICAL_INTERVENTION`) in `tests/golden_dataset.json` verified on every push via `pytest`. | JSON schema contract, physical guardrails, and threshold stability. |
+| **3. Cloud Shadow Mode** | Phase 4 | `src/fleet_simulator.py` executes parallel policy evaluation (`(θ₁*, θ₂*)` vs. `0.50` vs. Reactive) against the live Render HTTPS service. | End-to-end availability, shift reporting, and economic policy behavior. |
+| **4. Statistical vs. Operational Separation** | All Phases | Empirical metrics (`PR-AUC`, `F2`, `Brier`) are reported solely on UCI AI4I 2020; simulated streams validate serving and operational reporting only. | Honest, non-inflated model evaluation. |
 
 ---
 
-## 6. Matriz Secuencial de Desarrollo en Cascada (Roadmap & Gating Criteria)
+## 6. Project Milestones
 
-El desarrollo del proyecto se rige por un **modelo en cascada estricto**. Ninguna fase puede comenzar sin que los criterios de aceptación (*Definition of Done*) y los artefactos de la fase anterior hayan sido auditados y verificados.
-
-| Fase | Identificador & Enlace | Responsable / Rol | Pre-requisito Bloqueante | Entregables Clave | Estado |
-| :---: | :--- | :--- | :--- | :--- | :---: |
-| **0** | [**Estándares Transversales**](tasks/00_transversal_standards.md) | Principal MLOps Architect | N/A (Norma Inicial) | `pyproject.toml`, `uv.lock`, lineamientos de doc, typing y calidad IA | `APROBADO` |
-| **1** | [**Ingesta & EDA**](tasks/01_data_ingestion_and_eda.md) | Data Ingestion & EDA Lead | Fase 0 aprobada | `data/raw/ai4i2020.csv`, holdout 20% bloqueado en `data/processed/`, features físicas vectorizadas, EDA sin data leakage | `COMPLETADO` |
-| **2** | [**Modelado & Benchmarks**](tasks/02_experimentation_and_benchmarks.md) | ML Modeling & Opt. Lead | Fase 1 completada (DoD cumplido) | 4 modelos comparados vía Stratified 5-Fold OOF, Simulación Monte Carlo $(\theta_1^*, \theta_2^*)$, evaluación única en Holdout, `models/best_model.bin` | `COMPLETADO` |
-| **3** | [**Refactorización, API & Simulador**](tasks/03_refactor_and_service_api.md) | Backend & MLOps Lead | Fase 2 completada (DoD cumplido) | `src/features.py`, `src/train.py`, `src/predict.py`, `src/fleet_simulator.py`, Golden Dataset y tests `pytest` al 100% | `COMPLETADO` |
-| **4** | [**Docker, Shadow Mode & Despliegue Cloud**](tasks/04_container_and_deployment.md) | Cloud & DevOps Lead | Fase 3 completada (DoD cumplido) | `Dockerfile`, `docker-compose.yml`, Despliegue Cloud Costo 0, Shadow Mode $(\theta_1^*, \theta_2^*)$ vs `0.5`, reporte de turno y pruebas `curl` | `COMPLETADO` |
-
----
-
-## 7. Capa Transversal Permanente (Documentación, Calidad y Reproducibilidad)
-
-En cumplimiento de la norma transversal [`docs/tasks/00_transversal_standards.md`](tasks/00_transversal_standards.md):
-- **Sincronización Continua de `README.md`:** No se posterga la redacción para el cierre del proyecto. Al finalizar cada fase, se actualiza atómicamente la sección correspondiente del `README.md` principal.
-- **Tipado y Calidad de Código:** Python 3.11 con type annotations estrictas, docstrings Google-style y cero prints sueltos en módulos de producción (usar `logging`).
-- **Reproducibilidad Determinista (Rúbrica 2 pts):** Todas las operaciones usan semilla fijada (`RANDOM_STATE = 42`). Gestión con Astral `uv` y exportación obligatoria sincronizada a `requirements.txt`.
-- **Rúbrica ML Zoomcamp:** El proyecto asegura 16/16 puntos distribuidos en Problem Description (2), EDA (2), Model Training (3), Script Export (1), Reproducibility (2), Containerization (2), Cloud Deployment (2), y Buenas Prácticas (2).
-
----
-
-## 8. Meta-Prompt Maestro de Orquestación para Agentes de IA
-
-Este bloque define las instrucciones de orquestación para cualquier Agente de Inteligencia Artificial que participe en el desarrollo de este repositorio:
-
-```markdown
-Eres un Senior ML Engineer / MLOps Lead trabajando en el proyecto "FleetReliability-AI".
-
-Tu forma de proceder en este repositorio debe seguir estrictamente estas directrices:
-1. ORQUESTACIÓN EN CASCADA:
-   - Consulta la tabla de la Sección 6 de @docs/PLAN.md para identificar la fase activa no completada.
-   - Respeta estrictamente los Pre-requisitos Bloqueantes (Gating Criteria). No inicies código de una fase si la anterior no tiene su Definition of Done (DoD) cumplido al 100%.
-2. LECTURA DE ESPECIFICACIÓN:
-   - Lee el documento técnico correspondiente en @docs/tasks/ (ej. 01_data_ingestion_and_eda.md).
-   - Consulta obligatoriamente las normas transversales en @docs/tasks/00_transversal_standards.md.
-3. ESTÁNDARES DE CALIDAD Y DESARROLLO CON IA:
-   - Principio anti-alucinación: Prohibido instalar o importar librerías ajenas a pyproject.toml / uv.lock.
-   - Principio de preservación e idempotencia: No elimines código ni comentarios preexistentes sin justificación explícita.
-   - Verificación empírica en terminal: Ninguna tarea se considera lista sin haber ejecutado los comandos de verificación (pytest, uv run python ..., curl).
-4. CIERRE DE FASE:
-   - Actualiza la sección correspondiente del README.md principal.
-   - Verifica el checklist de Definition of Done (DoD) en el documento de la tarea.
-   - Actualiza el estado en la tabla de @docs/PLAN.md a "COMPLETADO".
-```
+| Phase | Scope | Key Deliverables | Status |
+| :---: | :--- | :--- | :---: |
+| **Phase 1** | Data Ingestion, Physics Features & EDA | `src/data_loader.py`, `src/features.py`, leakage-free 80/20 splits, EDA figures, `LogisticRegression` CV baseline | `COMPLETED` |
+| **Phase 2** | Multi-Model Benchmarking & 2D Monte Carlo | `src/montecarlo.py`, 4-family 5-Fold CV benchmarks, isotonic calibration, `(θ₁*, θ₂*)` optimization, `models/best_model.bin` | `COMPLETED` |
+| **Phase 3** | Production Modularization, API & Simulator | `src/train.py`, `src/predict.py` (FastAPI), `src/fleet_simulator.py`, Golden Dataset, `91` passing `pytest` tests | `COMPLETED` |
+| **Phase 4** | Containerization, Cloud Deploy & Shadow Mode | Hardened `Dockerfile`, `docker-compose.yml`, CI `docker-build` gate, `scripts/test_e2e_cloud.sh`, live Render HTTPS service, `reports/cloud_shadow_report.json` | `COMPLETED` |

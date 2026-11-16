@@ -1,4 +1,4 @@
-# FleetReliability-AI 🚜⚙️
+# FleetReliability-AI
 
 **Predictive Maintenance & Condition-Based Monitoring (CBM) System for Heavy Industrial & Mining Equipment**  
 *Machine Learning Zoomcamp — Mid-Term Project*
@@ -120,10 +120,10 @@ The project benchmarks telemetry from the **UCI AI4I 2020 Predictive Maintenance
 
 | Failure Mode | Mechanism | Count | % of Dataset | % of Failures ($n = 339$) |
 | :--- | :--- | ---: | ---: | ---: |
-| `HDF` | Heat Dissipation Failure ($\Delta T < 8.6\text{ K} \land \omega < 1380\text{ rpm}$) | 115 | 1.15% | 33.92% |
-| `OSF` | Overstrain Failure ($\text{Tool wear} \times \text{Torque} > \text{variant limit}$) | 98 | 0.98% | 28.91% |
-| `PWF` | Power Failure ($P_{\text{mech}} \notin [3.5, 9.0]\text{ kW}$) | 95 | 0.95% | 28.02% |
-| `TWF` | Tool Wear Failure (cutting-edge wear within $200$–$240\text{ min}$) | 46 | 0.46% | 13.57% |
+| `HDF` | Heat Dissipation Failure (`ΔT < 8.6 K` and `ω < 1380 rpm`) | 115 | 1.15% | 33.92% |
+| `OSF` | Overstrain Failure (`Tool wear × Torque > variant limit`) | 98 | 0.98% | 28.91% |
+| `PWF` | Power Failure (`P_mech ∉ [3.5, 9.0] kW`) | 95 | 0.95% | 28.02% |
+| `TWF` | Tool Wear Failure (cutting-edge wear within 200–240 min) | 46 | 0.46% | 13.57% |
 | `RNF` | Random Failure (uncorrelated stochastic event) | 19 | 0.19% | 5.60% |
 
 Additional empirical findings from [`notebooks/notebook.ipynb`](notebooks/notebook.ipynb):
@@ -234,23 +234,23 @@ Evaluated across the 5 CV folds on the champion `RandomForestClassifier` (`scori
 
 Notice how `rotational_speed_rpm` and the three physics-derived features (`strain_index_min_nm`, `mechanical_power_kw`, `temperature_difference_k`) jointly contribute **85.94%** of total OOF Permutation Feature Importance (vs. **71.52%** in MDI), whereas collinear raw variables (`torque_nm`, `air_temperature_k`, `process_temperature_k`) drop sharply under out-of-fold permutation.
 
-### 7.3 2D Joint Monte Carlo Cost Optimization ($M = 1{,}000$, $\lambda_{\text{risk}} = 0.15$)
+### 7.3 2D Joint Monte Carlo Cost Optimization (`M = 1,000`, `λ_risk = 0.15`)
 
-Using `src.montecarlo.optimize_dual_thresholds_mc` on the isotonic-calibrated OOF probabilities ($N = 8{,}000$) with $M = 1{,}000$ stochastic iterations ($\text{MTTR} \sim \text{LogNormal}(\mu=8\text{ h}, \sigma=2\text{ h})$, asset criticality $K_{\text{Type}} \in \{1.0, 1.5, 2.5\}$, $C_{\text{FP}} \sim \mathcal{N}(\$350, \$50)$, $C_{\text{TP}} \sim \mathcal{N}(\$1{,}200, \$200)$, $C_{\text{damage}} \sim \mathcal{N}(\$5{,}000, \$1{,}000)$, downtime rate $\$1{,}500\text{ USD/hr}$), we minimize the risk-adjusted objective over $\theta_1 < \theta_2$:
+Using `src.montecarlo.optimize_dual_thresholds_mc` on the isotonic-calibrated OOF probabilities (`N = 8,000`) with `M = 1,000` stochastic iterations (`MTTR ~ LogNormal(μ = 8 h, σ = 2 h)`, asset criticality `K_Type ∈ {1.0, 1.5, 2.5}`, `C_FP ~ Normal(USD 350, USD 50)`, `C_TP ~ Normal(USD 1,200, USD 200)`, `C_damage ~ Normal(USD 5,000, USD 1,000)`, downtime rate `USD 1,500/hr`), we minimize the risk-adjusted objective over `θ₁ < θ₂`:
 
 $$J(\theta_1, \theta_2) = \mathbb{E}[\text{Cost}(\theta_1, \theta_2)] + \lambda_{\text{risk}} \cdot \text{VaR}_{90}(\theta_1, \theta_2), \quad \lambda_{\text{risk}} = 0.15$$
 
-- **Joint 2D Optimal Thresholds:** $\theta_1^* = 0.0100$ (`theta_warning`), $\theta_2^* = 0.7600$ (`theta_critical`)
-- **Analytical Bayes Theoretical Reference:** $\theta_{\text{Bayes}} = 0.0158$ (`0.015801`)
+- **Joint 2D Optimal Thresholds:** `θ₁* = 0.0100` (`theta_warning`), `θ₂* = 0.7600` (`theta_critical`)
+- **Analytical Bayes Theoretical Reference:** `θ_Bayes = 0.0158` (`0.015801`)
 
-| Operational Policy (`train_dev`, $N = 8{,}000$) | $\mathbb{E}[\text{Cost}]$ (USD) | Cost Std (USD) | $P_{10}$ Cost (USD) | $P_{90}$ VaR (USD) | $P_{95}$ Cost (USD) | Objective $J$ (USD) | Savings vs. Static `0.50` | Savings vs. Reactive |
+| Operational Policy (`train_dev`, `N = 8,000`) | `E[Cost]` (USD) | Cost Std (USD) | `P₁₀` Cost (USD) | `P₉₀` VaR (USD) | `P₉₅` Cost (USD) | Objective `J` (USD) | Savings vs. Static `0.50` | Savings vs. Reactive |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| **Calibrated 2-Threshold `(0.01, 0.76)`** | **\$787,325.35** | \$13,937.42 | \$770,325.93 | **\$805,807.53** | \$811,345.92 | **\$908,196.48** | **41.86%** | **84.98%** |
-| Static Binary Threshold (`0.50`) | \$1,354,105.08 | \$31,292.31 | \$1,312,910.84 | \$1,395,209.86 | \$1,408,380.85 | \$1,563,386.56 | 0.00% | 74.17% |
-| Reactive Run-to-Failure | \$5,243,113.66 | \$62,432.40 | \$5,165,436.44 | \$5,324,576.01 | \$5,343,202.68 | \$6,041,800.06 | -287.20% | 0.00% |
+| **Calibrated 2-Threshold `(0.01, 0.76)`** | **$787,325.35** | $13,937.42 | $770,325.93 | **$805,807.53** | $811,345.92 | **$908,196.48** | **41.86%** | **84.98%** |
+| Static Binary Threshold (`0.50`) | $1,354,105.08 | $31,292.31 | $1,312,910.84 | $1,395,209.86 | $1,408,380.85 | $1,563,386.56 | 0.00% | 74.17% |
+| Reactive Run-to-Failure | $5,243,113.66 | $62,432.40 | $5,165,436.44 | $5,324,576.01 | $5,343,202.68 | $6,041,800.06 | -287.20% | 0.00% |
 
 ![2D Monte Carlo Cost Optimization Contour Map & Operational Policy Comparison](reports/figures/monte_carlo_cost_curve.png)
-*Figure: Left — 2D joint objective surface contour map / heatmap $J(\theta_1, \theta_2) = \mathbb{E}[\text{Cost}] + 0.15 \cdot P_{90}$ across $M = 1{,}000$ Monte Carlo realizations over the feasible region ($\theta_1 < \theta_2$), pinpointing the joint optimum $(\theta_1^* = 0.01, \theta_2^* = 0.76)$ ($J_{\min} = \$0.908\text{M}$, $\mathbb{E}[\text{Cost}] = \$0.787\text{M}$, $\text{VaR } P_{90} = \$0.806\text{M}$) alongside the analytical Bayes reference $\theta_{\text{Bayes}} = 0.0158$. Right — Total fleet cost and $P_{10}\text{–}P_{90}$ uncertainty bands on `train_dev` comparing the calibrated dual-threshold policy against static binary (`0.50`) and reactive run-to-failure baselines.*
+*Figure: Left — 2D joint objective surface contour map / heatmap `J(θ₁, θ₂) = E[Cost] + 0.15 · P₉₀` across `M = 1,000` Monte Carlo realizations over the feasible region (`θ₁ < θ₂`), pinpointing the joint optimum `(θ₁* = 0.01, θ₂* = 0.76)` (`J_min = USD 0.908M`, `E[Cost] = USD 0.787M`, `VaR P₉₀ = USD 0.806M`) alongside the analytical Bayes reference `θ_Bayes = 0.0158`. Right — Total fleet cost and `P₁₀–P₉₀` uncertainty bands on `train_dev` comparing the calibrated dual-threshold policy against static binary (`0.50`) and reactive run-to-failure baselines.*
 
 ### 7.4 Single Final Evaluation on Locked Holdout Test (`2,000` Rows) & Artifact Export
 
@@ -271,13 +271,13 @@ With all modeling, calibration, and dual-threshold decisions frozen, [`data/proc
 | `INSPECTION_REQUIRED` ($0.01 \le p < 0.76$) | 200 | 10.0% | 12 |
 | `CRITICAL_INTERVENTION` ($p \ge 0.76$) | 54 | 2.7% | 53 |
 
-| Holdout Operational Policy ($N = 2{,}000$, $M = 1{,}000$) | $\mathbb{E}[\text{Cost}]$ (USD) | Cost Std (USD) | $P_{10}$ Cost (USD) | $P_{90}$ VaR (USD) | $P_{95}$ Cost (USD) | Objective $J$ (USD) | Savings vs. Static `0.50` | Savings vs. Reactive |
+| Holdout Operational Policy (`N = 2,000`, `M = 1,000`) | `E[Cost]` (USD) | Cost Std (USD) | `P₁₀` Cost (USD) | `P₉₀` VaR (USD) | `P₉₅` Cost (USD) | Objective `J` (USD) | Savings vs. Static `0.50` | Savings vs. Reactive |
 | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| **Calibrated 2-Threshold `(0.01, 0.76)`** | **\$205,883.49** | \$6,712.02 | \$197,476.89 | **\$214,705.45** | \$217,983.57 | **\$238,089.30** | **38.21%** | **85.23%** |
-| Static Binary Threshold (`0.50`) | \$333,211.18 | \$15,799.30 | \$313,558.78 | \$354,121.31 | \$360,070.09 | \$386,329.38 | 0.00% | 76.10% |
-| Reactive Run-to-Failure | \$1,394,166.18 | \$34,332.11 | \$1,351,950.88 | \$1,439,596.11 | \$1,451,371.29 | \$1,610,105.59 | -318.40% | 0.00% |
+| **Calibrated 2-Threshold `(0.01, 0.76)`** | **$205,883.49** | $6,712.02 | $197,476.89 | **$214,705.45** | $217,983.57 | **$238,089.30** | **38.21%** | **85.23%** |
+| Static Binary Threshold (`0.50`) | $333,211.18 | $15,799.30 | $313,558.78 | $354,121.31 | $360,070.09 | $386,329.38 | 0.00% | 76.10% |
+| Reactive Run-to-Failure | $1,394,166.18 | $34,332.11 | $1,351,950.88 | $1,439,596.11 | $1,451,371.29 | $1,610,105.59 | -318.40% | 0.00% |
 
-The calibrated pipeline, canonical feature schema, operational thresholds $(\theta_1^* = 0.01, \theta_2^* = 0.76)$, CV/holdout metrics, and Monte Carlo cost parameters are packaged in [`models/best_model.bin`](models/best_model.bin) (`823.8 KB`, `RandomForestClassifier_Calibrated_Isotonic`, `model_version="0.1.0"`).
+The calibrated pipeline, canonical feature schema, operational thresholds (`θ₁* = 0.01, θ₂* = 0.76`), CV/holdout metrics, and Monte Carlo cost parameters are packaged in [`models/best_model.bin`](models/best_model.bin) (`823.8 KB`, `RandomForestClassifier_Calibrated_Isotonic`, `model_version="0.1.0"`).
 
 ---
 
@@ -588,9 +588,9 @@ Observed 2-shift operational simulation (`5` machines × `24` hourly steps = `12
 
 | Economic Policy Comparison (USD) | Expected Total Cost | Net Savings of Calibrated Policy |
 | :--- | :---: | :---: |
-| **Calibrated Multi-Threshold ($\theta_1^*=0.01, \theta_2^*=0.76$)** | **$48,097.74** | — |
-| **Static Threshold ($0.50$)** | $45,642.18 | -$2,455.56 *(vs Static 0.5)* |
+| **Calibrated Multi-Threshold (`θ₁* = 0.01`, `θ₂* = 0.76`)** | **$48,097.74** | — |
+| **Static Threshold (`0.50`)** | $45,642.18 | -$2,455.56 *(vs Static 0.5)* |
 | **Reactive Run-to-Failure** | $509,828.80 | **+$461,731.06** *(vs Reactive)* |
 
 > [!NOTE]
-> **Why `Static (0.50)` is `$2,455.56` lower than `(0.01, 0.76)` in this 24h synthetic run:** The dual thresholds $(\theta_1^*=0.01, \theta_2^*=0.76)$ were calibrated on the empirical UCI AI4I 2020 distribution (~3.4% failure rate) under a risk-averse objective ($J = \mathbb{E}[\text{Cost}] + 0.15 \cdot P_{90}$). In this accelerated 24h Wiener simulation (`120` events, `31.7%` critical events), `theta_warning=0.01` issues conservative early inspections (`INSPECTION_REQUIRED`, $c_{\text{fp}}$) and `theta_critical=0.76` routes mid-high probabilities ($0.50 \le p < 0.76$) through inspection before intervention ($c_{\text{fp}} + c_{\text{tp}}$ on true positives), whereas `Static (0.50)` triggers immediate intervention ($c_{\text{tp}}$) without an inspection buffer. Even in this high-density synthetic stream, the calibrated policy reduces total maintenance cost by **90.6%** (**+$461,731.06**) relative to Reactive Run-to-Failure.
+> **Why `Static (0.50)` is `$2,455.56` lower than `(0.01, 0.76)` in this 24h synthetic run:** The dual thresholds (`θ₁* = 0.01`, `θ₂* = 0.76`) were calibrated on the empirical UCI AI4I 2020 distribution (~3.4% failure rate) under a risk-averse objective (`J = E[Cost] + 0.15 · P₉₀`). In this accelerated 24h Wiener simulation (`120` events, `31.7%` critical events), `theta_warning=0.01` issues conservative early inspections (`INSPECTION_REQUIRED`, `C_FP`) and `theta_critical=0.76` routes mid-high probabilities (`0.50 ≤ p < 0.76`) through inspection before intervention (`C_FP + C_TP` on true positives), whereas `Static (0.50)` triggers immediate intervention (`C_TP`) without an inspection buffer. Even in this high-density synthetic stream, the calibrated policy reduces total maintenance cost by **90.6%** (**+$461,731.06**) relative to Reactive Run-to-Failure.
