@@ -199,6 +199,9 @@ All four candidate families were tuned strictly on [`data/processed/train_dev.cs
 
 - **Champion Base Pipeline:** `RandomForestClassifier` (`n_estimators=100`, `max_depth=10`, `min_samples_split=5`, `min_samples_leaf=1`, `max_features=0.5`, `class_weight=None`) achieved the highest **CV PR-AUC (`0.9073` $\pm$ `0.0207`)**, highest **OOF PR-AUC (`0.9066`)**, highest **OOF $F_2$-Score (`0.8442`)**, and lowest **OOF Brier Score (`0.0064`)** across all four families.
 
+> [!NOTE]
+> **Methodological Caveat (Synthetic Benchmark vs. Real-World Telemetry):** While the engineered physical features (`mechanical_power_kw`, `temperature_difference_k`, `strain_index_min_nm`, `heat_stress_ratio`) are valid and grounded in thermodynamic and mechanical domain laws, the near-perfect separation observed in this benchmark largely stems from UCI AI4I 2020 being a synthetic dataset governed by deterministic failure rules (`HDF`, `PWF`, `OSF`). Because the decision boundaries become predominantly orthogonal once those physics terms are exposed, bagging decision trees (`RandomForestClassifier`) achieve top performance cleanly; however, on real-world industrial SCADA/sensor telemetry—characterized by higher noise, non-stationary drift, and complex non-linear interactions—gradient boosting models (`LightGBM`, `XGBoost`) are generally expected to outperform bagging by capturing subtler non-linear error structures.
+
 ### 7.2 Post-Hoc Probability Calibration (`Isotonic` vs `Sigmoid`) & Feature Importance (MDI vs PFI)
 
 #### Post-Hoc Calibration (`CalibratedClassifierCV`, `cv=5` OOF)
