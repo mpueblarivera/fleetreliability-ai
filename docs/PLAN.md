@@ -11,7 +11,7 @@
 | :--- | :--- |
 | **Project** | **FleetReliability-AI**: Predictive failure-risk and Condition-Based Monitoring (CBM) system for heavy industrial/mining machinery. |
 | **Business Problem** | Mitigate unplanned equipment downtime through early failure detection and stochastic cost-calibrated decision thresholds. |
-| **ML Formulation** | Calibrated binary probability `P(Failure | X) ∈ [0, 1]`, mapped to a **Tri-Zone Operational Action Policy** (`NORMAL`, `INSPECTION_REQUIRED`, `CRITICAL_INTERVENTION`) to avoid unnecessary full shutdowns. |
+| **ML Formulation** | Calibrated binary probability `P(Failure \| X) ∈ [0, 1]`, mapped to a **Tri-Zone Operational Action Policy** (`NORMAL`, `INSPECTION_REQUIRED`, `CRITICAL_INTERVENTION`) to avoid unnecessary full shutdowns. |
 | **Benchmark Dataset** | *AI4I 2020 Predictive Maintenance Dataset* (UCI Machine Learning Repository), 10,000 industrial sensor telemetry records. |
 | **Core Stack** | Python 3.11, Astral `uv`, Scikit-learn, LightGBM, XGBoost, FastAPI, Pydantic v2, Docker, Render. |
 
