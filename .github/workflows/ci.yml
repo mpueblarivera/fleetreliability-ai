@@ -33,3 +33,16 @@ jobs:
 
       - name: Run unit tests with Pytest
         run: uv run pytest -v
+
+  docker-build:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image and verify non-root user
+        run: |
+          docker build -t fleetreliability-ai:ci .
+          docker inspect --format='{{.Config.User}}' fleetreliability-ai:ci | grep -qx 'appuser'

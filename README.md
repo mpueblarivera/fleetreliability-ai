@@ -3,6 +3,9 @@
 **Predictive Maintenance & Condition-Based Monitoring (CBM) System for Heavy Industrial & Mining Equipment**  
 *Machine Learning Zoomcamp — Mid-Term Project*
 
+[![Render Live Service](https://img.shields.io/badge/Render-Live%20Service-46E3B7?logo=render&logoColor=white)](https://fleetreliability-ai.onrender.com/docs)
+[![Docker](https://img.shields.io/badge/Docker-python%3A3.11--slim-2496ED?logo=docker&logoColor=white)](Dockerfile)
+
 ---
 
 ## 1. Executive Summary & Business Problem
@@ -498,3 +501,93 @@ The `pytest` suite (`91` collected tests) enforces contract, physics, calibratio
 
 > [!NOTE]
 > **Architecture Design Note (Model Serialization Format: `joblib` `.bin` vs. `ONNX` / `skops`):** For this Python 3.11 / `scikit-learn 1.9.1` FastAPI microservice, the pipeline (`ColumnTransformer` + `CalibratedClassifierCV(RandomForestClassifier, method="isotonic", cv=5)`) is packaged via `joblib.dump(..., compress=3)` into a single self-contained artifact ([`models/best_model.bin`](models/best_model.bin), `823.8 KB`) alongside calibrated thresholds, feature contracts, and metrics, with dependency parity enforced by `uv.lock` and Docker. For larger multi-language production environments, untrusted artifact boundaries, or strict ultra-low-latency edge serving, migrating the inference graph to **ONNX (`.onnx` via `skl2onnx` + `onnxruntime`)**—paired with a sidecar metadata JSON for thresholds—or using **`skops`** is the recommended next evolution to decouple serving from Python/scikit-learn versions and eliminate pickle deserialization risk.
+
+---
+
+## 9. Production Containerization, Cloud Deployment & Shadow Mode Verification
+
+The inference microservice is containerized with a multi-stage `python:3.11-slim` + `uv` [`Dockerfile`](Dockerfile) (running as a non-root user on port `9696`), orchestrated locally via [`docker-compose.yml`](docker-compose.yml), and deployed live on **Render** (`https://fleetreliability-ai.onrender.com`).
+
+### 9.1 Public Cloud Endpoints (Render)
+
+| Endpoint | Method | Purpose | Public URL |
+| :--- | :---: | :--- | :--- |
+| **Swagger UI** | `GET` | Interactive OpenAPI documentation | https://fleetreliability-ai.onrender.com/docs |
+| **ReDoc** | `GET` | Alternative API reference | https://fleetreliability-ai.onrender.com/redoc |
+| **Healthcheck** | `GET` | Liveness, model status, version & calibrated thresholds | https://fleetreliability-ai.onrender.com/health |
+| **Inference** | `POST` | Real-time telemetry scoring & CBM action recommendation | https://fleetreliability-ai.onrender.com/predict |
+
+> [!NOTE]
+> **Render Free Tier Cold Starts:** Instances spin down after ~15 minutes of inactivity. The initial request after idle incurs a **~40–55s cold start** while the container boots and loads `models/best_model.bin` (observed `52.88s` on `GET /health`). Once warm, inference and validation endpoints respond in **`0.23s–0.75s`**.
+
+### 9.2 Three-Tier Reproduction Guide
+
+#### Level 1 — Zero-Install Cloud Verification
+Verify the live Render deployment directly from any terminal with `curl` and `jq` (no Python or Docker required):
+```bash
+# Quick healthcheck
+curl -s https://fleetreliability-ai.onrender.com/health | jq .
+
+# Full automated E2E suite (Health + 3 Operational Tiers + 422 Physical Validation)
+bash scripts/test_e2e_cloud.sh https://fleetreliability-ai.onrender.com
+```
+
+#### Level 2 — Local Containerized Execution (Docker)
+Build and run the production image locally on port `9696`, then run the same E2E suite against `localhost`:
+```bash
+docker compose up --build -d
+bash scripts/test_e2e_cloud.sh http://localhost:9696
+```
+
+#### Level 3 — Local `uv` Environment & Shadow Mode Simulation
+Run the FastAPI service and the stochastic fleet simulator (`src/fleet_simulator.py`) against either the local server or the live cloud endpoint:
+```bash
+# 1. Sync environment
+uv sync --all-groups
+
+# 2. (Optional) Start local API server
+uv run uvicorn src.predict:app --host 0.0.0.0 --port 9696
+
+# 3. Run 2-shift (24h, 5 machines = 120 events) Shadow Mode against Render
+PYTHONPATH=. uv run python src/fleet_simulator.py \
+  --api-url https://fleetreliability-ai.onrender.com \
+  --num-machines 5 \
+  --shift-hours 12 \
+  --num-shifts 2 \
+  --interval-hours 1 \
+  --seed 42 \
+  --report-path reports/cloud_shadow_report.json
+```
+
+### 9.3 Methodological Separation: Statistical vs. Operational Validation
+
+- **Statistical Generalization (Empirical Data Only):** Predictive metrics (PR-AUC, $F_2$-Score, Brier Score, ROC-AUC) are evaluated **exclusively** on the locked 20% real-world holdout split of the **UCI AI4I 2020** dataset.
+- **Operational & Economic Validation (Shadow Mode):** `src/fleet_simulator.py` generates synthetic Wiener / random-walk degradation streams solely to validate end-to-end HTTP serving, CBM work-order generation, and relative economic policy behavior under uncertainty. Statistical predictive metrics are never computed or reported on simulated telemetry.
+
+### 9.4 Verified Cloud Evidence (`https://fleetreliability-ai.onrender.com`)
+
+#### A. Automated E2E Suite (`scripts/test_e2e_cloud.sh`)
+Observed execution against `https://fleetreliability-ai.onrender.com`:
+
+| Check | Endpoint | HTTP Status | Observed Latency | Key Verified Output |
+| :--- | :---: | :---: | :---: | :--- |
+| **Healthcheck** | `GET /health` | `200` | `52.881799s` *(cold start)* | `status: "HEALTHY"`, `model_loaded: true`, `model_version: "0.1.0"`, `thresholds: {"theta_warning": 0.01, "theta_critical": 0.76}` |
+| **Normal Tier** | `POST /predict` | `200` | `0.751832s` | `PUMP-SAG-GOLDEN-01` → `failure_risk_score: 0.0`, `operational_status: "NORMAL"` |
+| **Inspection Tier** | `POST /predict` | `200` | `0.542098s` | `COMPRESSOR-GOLDEN-02` → `failure_risk_score: 0.3034557323541412`, `operational_status: "INSPECTION_REQUIRED"` |
+| **Critical Tier** | `POST /predict` | `200` | `0.548656s` | `CRUSHER-GOLDEN-03` → `failure_risk_score: 1.0`, `operational_status: "CRITICAL_INTERVENTION"` |
+| **Physical Guard** | `POST /predict` | `422` | `0.225099s` | Invalid `air_temperature_k: 100.0` rejected by Pydantic v2 physical bounds |
+
+#### B. Cloud Shadow Mode Report (`reports/cloud_shadow_report.json`)
+Observed 2-shift operational simulation (`5` machines × `24` hourly steps = `120` telemetry events, `seed=42`, `45` maintenance work orders issued):
+
+| Shift / Scope | `NORMAL` | `INSPECTION_REQUIRED` | `CRITICAL_INTERVENTION` | Total Events | Work Orders Issued |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Shift 1** (Hours 1–12) | 55 | 4 | 1 | 60 | 5 |
+| **Shift 2** (Hours 13–24) | 20 | 3 | 37 | 60 | 40 |
+| **Total (24h)** | **75** | **7** | **38** | **120** | **45** |
+
+| Economic Policy Comparison (USD) | Expected Total Cost | Net Savings of Calibrated Policy |
+| :--- | :---: | :---: |
+| **Calibrated Multi-Threshold ($\theta_1^*=0.01, \theta_2^*=0.76$)** | **$48,097.74** | — |
+| **Static Threshold ($0.50$)** | $45,642.18 | -$2,455.56 *(vs Static 0.5)* |
+| **Reactive Run-to-Failure** | $509,828.80 | **+$461,731.06** *(vs Reactive)* |
