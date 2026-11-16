@@ -275,3 +275,226 @@ With all modeling, calibration, and dual-threshold decisions frozen, [`data/proc
 | Reactive Run-to-Failure | \$1,394,166.18 | \$34,332.11 | \$1,351,950.88 | \$1,439,596.11 | \$1,451,371.29 | \$1,610,105.59 | -318.40% | 0.00% |
 
 The calibrated pipeline, canonical feature schema, operational thresholds $(\theta_1^* = 0.01, \theta_2^* = 0.76)$, CV/holdout metrics, and Monte Carlo cost parameters are packaged in [`models/best_model.bin`](models/best_model.bin) (`823.8 KB`, `RandomForestClassifier_Calibrated_Isotonic`, `model_version="0.1.0"`).
+
+---
+
+## 8. Phase 3: Production Modularization, FastAPI Service & Stochastic Fleet Simulator
+
+> [!NOTE]
+> **Phase Status:** `COMPLETED` — Production feature engineering ([`src/features.py`](src/features.py)), autonomous CLI training with locked holdout governance ([`src/train.py`](src/train.py)), FastAPI REST inference service with Pydantic v2 physical validation and tri-threshold CBM policy ([`src/predict.py`](src/predict.py)), stochastic Wiener/Random-Walk fleet simulator ([`src/fleet_simulator.py`](src/fleet_simulator.py)), and the 91-test `pytest` suite including the CI/CD Golden Dataset ([`tests/golden_dataset.json`](tests/golden_dataset.json)) have been implemented and verified against [`docs/tasks/03_refactor_and_service_api.md`](docs/tasks/03_refactor_and_service_api.md).
+
+### 8.1 Reproducible `uv` Workflow (Training, Testing, API & Simulator)
+
+```bash
+# 1. Sync deterministic virtual environment with uv
+uv sync
+
+# 2. Re-train, calibrate (5-fold isotonic), and serialize the model artifact via CLI
+#    (respects the locked 20% holdout split in data/processed/)
+uv run python -m src.train --data-path data/raw/ai4i2020.csv --output-dir models/
+
+# 3. Run the full unit, integration, and Golden Dataset test suite
+uv run pytest tests/ -v
+
+# 4. Start the FastAPI inference service in development mode (port 9696)
+uv run uvicorn src.predict:app --host 0.0.0.0 --port 9696 --reload
+
+# 5. (Operational Demo) Run the stochastic fleet simulator against the live API
+uv run python -m src.fleet_simulator --api-url http://localhost:9696 --num-machines 5 --num-shifts 2
+```
+
+> [!IMPORTANT]
+> **Statistical vs. Operational Validation:** Predictive metrics (`PR-AUC`, $F_2$-Score, `Brier Score`) are reported **exclusively** on real UCI AI4I 2020 data (`train_dev` CV/OOF and locked `test_holdout`). The stochastic simulator (`src/fleet_simulator.py`) validates end-to-end API latency, shift-level CBM reporting (`reports/shift_report.json`), and relative economic behavior across policies. A verified 5-machine, 2-shift run (`120` hourly observations) issued `45` preventive/critical work orders (`75` `NORMAL`, `7` `INSPECTION_REQUIRED`, `38` `CRITICAL_INTERVENTION`), yielding `$48,097.74` calibrated policy cost vs. `$509,828.80` reactive run-to-failure (`$461,731.06` net savings vs. reactive).
+
+### 8.2 Verified REST API `curl` Examples (`localhost:9696`)
+
+#### 1. Service Health Check (`GET /health`)
+```bash
+curl -s -X GET http://localhost:9696/health | jq .
+```
+**Verified Response (`200 OK`):**
+```json
+{
+  "status": "HEALTHY",
+  "model_loaded": true,
+  "model_version": "0.1.0",
+  "thresholds": {
+    "theta_warning": 0.01,
+    "theta_critical": 0.76
+  },
+  "uptime_seconds": 0.848
+}
+```
+
+#### 2. Normal Operation Inference (`POST /predict` — `NORMAL`)
+```bash
+curl -s -X POST http://localhost:9696/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "machine_id": "PUMP-SAG-GOLDEN-01",
+    "machine_type": "M",
+    "air_temperature_k": 298.2,
+    "process_temperature_k": 308.7,
+    "rotational_speed_rpm": 1500.0,
+    "torque_nm": 42.8,
+    "tool_wear_min": 45.0
+  }' | jq .
+```
+**Verified Response (`200 OK`):**
+```json
+{
+  "machine_id": "PUMP-SAG-GOLDEN-01",
+  "failure_risk_score": 0.0,
+  "operational_status": "NORMAL",
+  "recommended_cbm_action": "Continue normal operation. Maintain standard shift lubrication and routine inspection schedule.",
+  "criticality_level": "LOW",
+  "derived_physics": {
+    "mechanical_power_kw": 6.723008278682157,
+    "temperature_difference_k": 10.5,
+    "strain_index_min_nm": 1925.9999999999998,
+    "heat_stress_ratio": 7.0
+  },
+  "model_version": "0.1.0",
+  "timestamp": "2026-11-16T02:12:38.634248Z"
+}
+```
+
+#### 3. Preventive CBM Warning (`POST /predict` — `INSPECTION_REQUIRED`)
+```bash
+curl -s -X POST http://localhost:9696/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "machine_id": "COMPRESSOR-GOLDEN-02",
+    "machine_type": "H",
+    "air_temperature_k": 300.7,
+    "process_temperature_k": 310.8,
+    "rotational_speed_rpm": 1296.0,
+    "torque_nm": 58.2,
+    "tool_wear_min": 204.0
+  }' | jq .
+```
+**Verified Response (`200 OK`):**
+```json
+{
+  "machine_id": "COMPRESSOR-GOLDEN-02",
+  "failure_risk_score": 0.3034557323541412,
+  "operational_status": "INSPECTION_REQUIRED",
+  "recommended_cbm_action": "Preventive CBM alert for Class H asset. Issue a non-destructive inspection work order for the next shift handover (bearing vibration analysis and component thermography).",
+  "criticality_level": "HIGH",
+  "derived_physics": {
+    "mechanical_power_kw": 7.898717913361601,
+    "temperature_difference_k": 10.100000000000023,
+    "strain_index_min_nm": 11872.800000000001,
+    "heat_stress_ratio": 7.793209876543227
+  },
+  "model_version": "0.1.0",
+  "timestamp": "2026-11-16T02:12:38.888559Z"
+}
+```
+
+#### 4. Critical Failure Risk (`POST /predict` — `CRITICAL_INTERVENTION`)
+```bash
+curl -s -X POST http://localhost:9696/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "machine_id": "CRUSHER-GOLDEN-03",
+    "machine_type": "H",
+    "air_temperature_k": 303.0,
+    "process_temperature_k": 313.5,
+    "rotational_speed_rpm": 1250.0,
+    "torque_nm": 88.0,
+    "tool_wear_min": 245.0
+  }' | jq .
+```
+**Verified Response (`200 OK`):**
+```json
+{
+  "machine_id": "CRUSHER-GOLDEN-03",
+  "failure_risk_score": 1.0,
+  "operational_status": "CRITICAL_INTERVENTION",
+  "recommended_cbm_action": "IMMINENT FAILURE RISK on critical Class H asset. Execute immediate load derating (reduce RPM by 50%) and coordinate an immediate planned shutdown with the shift supervisor to prevent catastrophic damage.",
+  "criticality_level": "CRITICAL",
+  "derived_physics": {
+    "mechanical_power_kw": 11.519173063162574,
+    "temperature_difference_k": 10.5,
+    "strain_index_min_nm": 21560.0,
+    "heat_stress_ratio": 8.4
+  },
+  "model_version": "0.1.0",
+  "timestamp": "2026-11-16T02:12:39.115554Z"
+}
+```
+
+#### 5. Physical Range Validation Error (`POST /predict` — `422 Unprocessable Entity`)
+```bash
+curl -s -X POST http://localhost:9696/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "machine_id": "INVALID-PUMP",
+    "machine_type": "INVALID_TYPE",
+    "air_temperature_k": 400.0,
+    "process_temperature_k": 308.7,
+    "rotational_speed_rpm": 400.0,
+    "torque_nm": 250.0,
+    "tool_wear_min": -10.0
+  }' | jq .
+```
+**Verified Response (`422 Unprocessable Entity`):**
+```json
+{
+  "detail": [
+    {
+      "type": "literal_error",
+      "loc": ["body", "machine_type"],
+      "msg": "Input should be 'L', 'M' or 'H'",
+      "input": "INVALID_TYPE",
+      "ctx": {"expected": "'L', 'M' or 'H'"}
+    },
+    {
+      "type": "less_than_equal",
+      "loc": ["body", "air_temperature_k"],
+      "msg": "Input should be less than or equal to 350",
+      "input": 400.0,
+      "ctx": {"le": 350.0}
+    },
+    {
+      "type": "greater_than_equal",
+      "loc": ["body", "rotational_speed_rpm"],
+      "msg": "Input should be greater than or equal to 500",
+      "input": 400.0,
+      "ctx": {"ge": 500.0}
+    },
+    {
+      "type": "less_than_equal",
+      "loc": ["body", "torque_nm"],
+      "msg": "Input should be less than or equal to 200",
+      "input": 250.0,
+      "ctx": {"le": 200.0}
+    },
+    {
+      "type": "greater_than_equal",
+      "loc": ["body", "tool_wear_min"],
+      "msg": "Input should be greater than or equal to 0",
+      "input": -10.0,
+      "ctx": {"ge": 0.0}
+    }
+  ]
+}
+```
+
+### 8.3 Automated Test Suite Summary (`tests/`)
+
+The `pytest` suite (`91` collected tests) enforces contract, physics, calibration, and operational invariants across all modules:
+
+| Test File | Scope & Verified Invariants |
+| :--- | :--- |
+| [`tests/test_features.py`](tests/test_features.py) | Pure vectorized physics equations, zero-RPM $\epsilon$ guard, `PhysicalFeatureTransformer` immutability & column checks, and leakage-free `prepare_training_matrices`. |
+| [`tests/test_montecarlo.py`](tests/test_montecarlo.py) | Analytical Bayes threshold, LogNormal MTTR & criticality $K_{\text{Type}}$ cost realizations, deterministic 2D grid optimization, and tri-zone loss evaluation. |
+| [`tests/test_model_artifact.py`](tests/test_model_artifact.py) | Serialized `models/best_model.bin` schema completeness, ordered finite thresholds, canonical feature contract, quality gates, and end-to-end inference. |
+| [`tests/test_train.py`](tests/test_train.py) | Autonomous CLI `src/train.py` end-to-end execution with Monte Carlo calibration, explicit threshold overrides, `--no-calibrate`, and domain error handling. |
+| [`tests/test_api.py`](tests/test_api.py) | FastAPI `TestClient` integration for `/health`, `503` when model is missing, all 3 operational zones on `/predict`, `422` physical/thermal validations, and `/docs` + `/redoc`. |
+| [`tests/test_golden.py`](tests/test_golden.py) | CI/CD Golden Dataset regression against [`tests/golden_dataset.json`](tests/golden_dataset.json) verifying `NORMAL`, `INSPECTION_REQUIRED`, and `CRITICAL_INTERVENTION` contracts, risk bounds, and physics outputs. |
+| [`tests/test_simulator.py`](tests/test_simulator.py) | Deterministic seeded Wiener/Random-Walk trajectories, `TelemetryPayload` range adherence, monotonic `tool_wear_min`, economic policy consistency, and end-to-end HTTP stub & CLI execution. |
+
+> [!NOTE]
+> **Architecture Design Note (Model Serialization Format: `joblib` `.bin` vs. `ONNX` / `skops`):** For this Python 3.11 / `scikit-learn 1.9.1` FastAPI microservice, the pipeline (`ColumnTransformer` + `CalibratedClassifierCV(RandomForestClassifier, method="isotonic", cv=5)`) is packaged via `joblib.dump(..., compress=3)` into a single self-contained artifact ([`models/best_model.bin`](models/best_model.bin), `823.8 KB`) alongside calibrated thresholds, feature contracts, and metrics, with dependency parity enforced by `uv.lock` and Docker. For larger multi-language production environments, untrusted artifact boundaries, or strict ultra-low-latency edge serving, migrating the inference graph to **ONNX (`.onnx` via `skl2onnx` + `onnxruntime`)**—paired with a sidecar metadata JSON for thresholds—or using **`skops`** is the recommended next evolution to decouple serving from Python/scikit-learn versions and eliminate pickle deserialization risk.
